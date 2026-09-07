@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from .config import CAPTURE_DIR
 from .database import initialize, connection
-from .services import now, category_for, settings, save_settings, analyze, latest_brief
+from .services import now, category_for, settings, save_settings, analyze, latest_brief, analyze_latest_capture, ollama_health
 
 app = FastAPI(title="ReFocus Local API", version="0.1.0")
 app.add_middleware(
@@ -29,7 +29,7 @@ class SettingsIn(BaseModel):
 class GoalIn(BaseModel): title: str = Field(min_length=1, max_length=240); goal_date: Optional[str] = None
 class InterruptionIn(BaseModel): category: str; started_at: Optional[str] = None; ended_at: Optional[str] = None; resumed: bool = False
 @app.get("/api/health")
-def health(): return {"ok": True, "ollama": analyze("health check", "ReFocus", "Health")[2] == "ready"}
+def health(): return {"ok": True, "ollama": ollama_health()}
 @app.get("/api/settings")
 def get_settings(): return settings()
 @app.put("/api/settings")
@@ -68,6 +68,11 @@ def delete_capture(capture_id: int):
     return {"deleted": capture_id}
 @app.get("/api/resume-brief")
 def resume_brief(): return latest_brief()
+@app.post("/api/resume-brief/analyze-latest")
+def analyze_latest():
+    brief = analyze_latest_capture()
+    if not brief: raise HTTPException(404, "No snapshot is available to analyze")
+    return brief
 @app.post("/api/interruptions")
 def record_interruption(body: InterruptionIn):
     started = body.started_at or now(); ended = body.ended_at
