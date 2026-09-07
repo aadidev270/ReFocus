@@ -1,0 +1,6 @@
+requests>=2.32,<3
+mss>=9,<11
+pywin32>=306; platform_system == "Windows"
+psutil>=5.9,<8
+pillow>=10,<12
+pytesseract>=0.3.13,<1
