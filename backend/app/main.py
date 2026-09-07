@@ -12,7 +12,13 @@ from .database import initialize, connection
 from .services import now, category_for, settings, save_settings, analyze, latest_brief
 
 app = FastAPI(title="ReFocus Local API", version="0.1.0")
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:5174"],
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):5\d{3}",
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.mount("/captures", StaticFiles(directory=CAPTURE_DIR), name="captures")
 @app.on_event("startup")
 def startup(): initialize()
