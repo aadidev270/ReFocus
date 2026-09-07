@@ -1,10 +1,11 @@
 """Windows companion agent. Run while the FastAPI backend is running."""
-import base64, io, time, ctypes
+import base64, io, time, ctypes, logging
 import requests
 from PIL import Image
 API = "http://127.0.0.1:8000/api"
 INTERVAL = 20
 THRESHOLDS = {"coding":300, "meeting":300, "browsing":420, "media":300, "other":300}
+logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(levelname)s  %(message)s")
 def foreground_window():
     try:
         import win32gui, win32process, psutil
@@ -29,17 +30,23 @@ def idle_seconds():
     except Exception: return 0
 def run():
     away_started = None
+    logging.info("ReFocus agent started. API: %s", API)
+    logging.info("Open the dashboard and enable Private capture to begin screenshots.")
     while True:
         try:
             cfg=requests.get(f"{API}/settings",timeout=3).json()
             if cfg.get("privacy_enabled") == "true":
-                app,title=foreground_window(); image=screenshot_b64(); payload={"app_name":app,"window_title":title,"image_base64":image,"ocr_text":ocr(image)}
+                app,title=foreground_window(); logging.info("Capturing %s — %s", app, title or "untitled window"); image=screenshot_b64(); payload={"app_name":app,"window_title":title,"image_base64":image,"ocr_text":ocr(image)}
                 response=requests.post(f"{API}/captures",json=payload,timeout=30); category=response.json().get("category","other")
                 idle=idle_seconds(); threshold=THRESHOLDS.get(category,300)
                 # Media pause-state is platform-specific; without a browser extension, only OS inactivity is used.
                 if idle >= threshold and away_started is None: away_started=time.time()
                 if away_started and idle < 3:
                     requests.post(f"{API}/interruptions",json={"category":category,"started_at":time.strftime('%Y-%m-%dT%H:%M:%S+00:00',time.gmtime(away_started)),"ended_at":time.strftime('%Y-%m-%dT%H:%M:%S+00:00',time.gmtime()),"resumed":True},timeout=5); away_started=None
+            else:
+                logging.info("Capture is paused by the privacy setting. Checking again in %s seconds.", cfg.get("capture_interval", INTERVAL))
             time.sleep(int(cfg.get("capture_interval",INTERVAL)))
-        except requests.RequestException: time.sleep(5)
+        except requests.RequestException as error:
+            logging.warning("Cannot reach the FastAPI backend (%s). Start it with: cd backend; uvicorn app.main:app --reload", error)
+            time.sleep(5)
 if __name__ == "__main__": run()
