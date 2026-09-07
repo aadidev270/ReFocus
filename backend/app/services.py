@@ -32,7 +32,9 @@ def analyze(text, app_name, title):
     try:
         response = httpx.post("http://localhost:11434/api/generate", json={"model": model, "prompt": prompt, "stream": False, "format": "json"}, timeout=15)
         response.raise_for_status(); payload = json.loads(response.json()["response"])
-        return (payload.get("summary", "Work context captured."), payload.get("next_action", "Resume the last task."), "ready")
+        summary = str(payload.get("summary") or "Work context captured.").strip()
+        next_action = str(payload.get("next_action") or "Review the latest capture and continue the task.").strip()
+        return (summary, next_action, "ready")
     except Exception:
         excerpt = re.sub(r"\s+", " ", text).strip()[:180]
         return (f"You were working in {title or app_name}. Recent text: {excerpt}", "Review the latest capture and continue from the last visible step.", "unavailable")
